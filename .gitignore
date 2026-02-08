@@ -1,0 +1,28 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.db
+*.db-shm
+*.db-wal
+
+## Node / React
+client/node_modules/
+client/dist/
+client/.env.local
+
+## IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+
+## Docker
+docker-compose.override.yml
+
+## OS
+.DS_Store
+Thumbs.db
