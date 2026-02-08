@@ -57,7 +57,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t border-border py-6 px-4 text-center text-sm text-muted">
-        VoteLive -- Open Source on GitHub
+        VoteLive v1.0 -- Auto-deployed via CI/CD
       </footer>
     </div>
   )
