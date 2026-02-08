@@ -132,6 +132,9 @@ app.MapGet("/api/polls/{shareCode}/results", async (string shareCode, AppDbConte
     return Results.Ok(results);
 });
 
+// Health check for Docker / load balancer
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
+
 // SignalR hub
 app.MapHub<PollHub>("/hubs/poll");
 

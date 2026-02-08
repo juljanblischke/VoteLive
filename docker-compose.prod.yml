@@ -1,0 +1,136 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - client
+    networks:
+      - frontend
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    restart: always
+    expose:
+      - "80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - frontend
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    expose:
+      - "5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5000
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=votelive;Username=votelive;Password=${POSTGRES_PASSWORD}
+      - ConnectionStrings__Redis=redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - frontend
+      - backend
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: votelive
+      POSTGRES_USER: votelive
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U votelive"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  # Automated daily database backup
+  db-backup:
+    image: postgres:16-alpine
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    entrypoint: >
+      sh -c "pg_dump -h postgres -U votelive votelive | gzip > /backups/votelive_$$(date +%Y%m%d_%H%M%S).sql.gz && find /backups -name '*.sql.gz' -mtime +7 -delete"
+    networks:
+      - backend
+    profiles:
+      - backup
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  frontend:
+  backend:
